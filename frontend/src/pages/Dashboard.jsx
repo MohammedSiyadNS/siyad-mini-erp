@@ -1,4 +1,6 @@
 import {
+  AreaChart,
+  Area,
   BarChart,
   Bar,
   XAxis,
@@ -7,6 +9,8 @@ import {
   ResponsiveContainer,
   CartesianGrid,
   Cell,
+  PieChart,
+  Pie,
 } from "recharts";
 
 import {
@@ -15,701 +19,425 @@ import {
   ShoppingCart,
   IndianRupee,
   RotateCcw,
+  Bell,
+  Calendar,
 } from "lucide-react";
 
 import { useEffect, useState } from "react";
 
-function Dashboard() {
+const AREA_COLORS = ["#8B6B43", "#C8A97E"];
+const DONUT_COLORS = ["#8B6B43", "#C8A97E", "#D2691E", "#DAA520", "#6B8E23"];
+const BAR_COLORS  = ["#8B6B43", "#A67C52", "#C8A97E", "#B08968", "#D6C2A8"];
 
-  const [products, setProducts] = useState([]);
+function fmtDate(d) {
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+export default function Dashboard() {
+  const [products,  setProducts]  = useState([]);
   const [customers, setCustomers] = useState([]);
-  const [sales, setSales] = useState([]);
-  const [returns, setReturns] = useState([]);
+  const [sales,     setSales]     = useState([]);
+  const [returns,   setReturns]   = useState([]);
 
-  const fetchDashboardData = () => {
-    fetch("http://localhost:5000/products")
-      .then((res) => res.json())
-      .then((data) => {
-        setProducts(data);
-      });
-
-    fetch("http://localhost:5000/customers")
-      .then((res) => res.json())
-      .then((data) => {
-        setCustomers(data);
-      });
-
-    fetch("http://localhost:5000/sales")
-      .then((res) => res.json())
-      .then((data) => {
-        setSales(data);
-      });
-
-    fetch("http://localhost:5000/sales/returns")
-      .then((res) => res.json())
-      .then((data) => {
-        setReturns(data);
-      });
+  const fetchAll = () => {
+    fetch("http://localhost:5000/products").then(r => r.json()).then(setProducts).catch(() => {});
+    fetch("http://localhost:5000/customers").then(r => r.json()).then(setCustomers).catch(() => {});
+    fetch("http://localhost:5000/sales").then(r => r.json()).then(setSales).catch(() => {});
+    fetch("http://localhost:5000/sales/returns").then(r => r.json()).then(setReturns).catch(() => {});
   };
 
   useEffect(() => {
-    fetchDashboardData();
-
-    const handleRefresh = () => {
-      fetchDashboardData();
-    };
-
-    window.addEventListener(
-      "mini-erp:refresh-data",
-      handleRefresh
-    );
-
-    return () => {
-      window.removeEventListener(
-        "mini-erp:refresh-data",
-        handleRefresh
-      );
-    };
+    fetchAll();
+    window.addEventListener("mini-erp:refresh-data", fetchAll);
+    return () => window.removeEventListener("mini-erp:refresh-data", fetchAll);
   }, []);
 
-  // TOTAL REVENUE
-  const totalRevenue = sales.reduce(
-    (sum, sale) => sum + sale.total,
-    0
+  /* ── derived ── */
+  const totalRevenue = sales.reduce((s, x) => s + x.total, 0);
+  const returnedQty  = returns.reduce((s, x) => s + x.quantity, 0);
+
+  const today = new Date();
+  const expiringProducts = products.filter(p => {
+    if (!p.expiry_date) return false;
+    const days = Math.ceil((new Date(p.expiry_date) - today) / 86400000);
+    return days >= 0 && days <= 1;
+  });
+  const expiredProducts = products.filter(
+    p => p.expiry_date && new Date(p.expiry_date) < today
   );
+  const lowStockProducts = products.filter(p => typeof p.stock === 'number' && p.stock < 10);
+  const alertCount = expiringProducts.length + expiredProducts.length + lowStockProducts.length;
 
-  const returnedProductsCount = returns.reduce(
-    (sum, item) => sum + item.quantity,
-    0
-  );
+  const end = new Date(), start = new Date();
+  start.setDate(end.getDate() - 6);
+  const dateRange = `${fmtDate(start)} – ${fmtDate(end)}`;
 
-  const returnedRevenue = returns.reduce(
-    (sum, item) => sum + item.total,
-    0
-  );
+  // bar chart
+  const barData = sales.reduce((acc, s) => {
+    const ex = acc.find(d => d.name === s.product);
+    if (ex) ex.revenue += s.total;
+    else acc.push({ name: s.product, revenue: s.total });
+    return acc;
+  }, []);
 
-  // CHART DATA
-  const chartData = sales.map((sale) => ({
-    name: sale.product,
-    revenue: sale.total,
-  }));
+  // area chart – top-2 products cumulative
+  const top2 = [...new Set(
+    [...sales].sort((a, b) => b.total - a.total).map(s => s.product)
+  )].slice(0, 2);
 
-  // CHART COLORS
-  const chartColors = [
-    "#8B6B43",
-    "#A67C52",
-    "#C8A97E",
-    "#B08968",
-    "#D6C2A8",
+  const areaData = sales.map((sale, i) => {
+    const prev = sales.slice(0, i);
+    const pt = { name: `#${i + 1}` };
+    top2.forEach(p => {
+      pt[p] = prev.filter(x => x.product === p).reduce((s, x) => s + x.total, 0)
+              + (sale.product === p ? sale.total : 0);
+    });
+    return pt;
+  });
+
+  // donut: product sales revenue share
+  const salesMap = sales.reduce((acc, s) => {
+    acc[s.product] = (acc[s.product] || 0) + s.total;
+    return acc;
+  }, {});
+  const totalSales = Object.values(salesMap).reduce((a, b) => a + b, 0);
+  const donutData = Object.entries(salesMap)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([name, value], i) => ({
+      name,
+      value,
+      pct: totalSales > 0 ? Math.round((value / totalSales) * 100) : 0,
+      color: DONUT_COLORS[i],
+    }));
+  const top2Pct = donutData.slice(0, 2).reduce((s, d) => s + d.pct, 0);
+
+  const stats = [
+    { label: "TOTAL\nPRODUCTS",  value: products.length,   icon: <Package size={18} />,     desc: "Active stock items available for sale." },
+    { label: "TOTAL\nCUSTOMERS", value: customers.length,  icon: <Users size={18} />,       desc: "Registered customer accounts and business contacts." },
+    { label: "TOTAL\nSALES",     value: sales.length,      icon: <ShoppingCart size={18} />, desc: "Completed invoices processed by the system." },
+    { label: "RETURNED\nUNITS",  value: returnedQty,       icon: <RotateCcw size={18} />,   desc: "Products returned to inventory during the current period." },
+    { label: "TOTAL\nREVENUE",   value: `₹ ${totalRevenue}`, icon: <IndianRupee size={18} />, desc: "Net sales revenue after returned items are removed from active invoices." },
   ];
 
-  // EXPIRY CHECK
-  const today = new Date();
-
-  const expiringProducts = products.filter((product) => {
-
-    if (!product.expiry_date) return false;
-
-    const expiry = new Date(product.expiry_date);
-
-    const difference = expiry - today;
-
-    const daysLeft = Math.ceil(
-      difference / (1000 * 60 * 60 * 24)
-    );
-
-    return daysLeft <= 1 && daysLeft >= 0;
-
-  });
-
-  const expiredProducts = products.filter((product) => {
-
-    if (!product.expiry_date) return false;
-
-    const expiry = new Date(product.expiry_date);
-
-    return expiry < today;
-
-  });
-
+  /* ───────────────────────────── RENDER ───────────────────────────── */
   return (
+    <div style={{
+      height: "100%",
+      display: "flex",
+      flexDirection: "column",
+      gap: 10,
+      fontFamily: "'Inter', sans-serif",
+      overflow: "hidden",
+    }}>
 
-    <div className="h-screen overflow-auto bg-gradient-to-br from-[#F5F0E6] via-[#E8DCCB] to-[#D6C2A8] p-3 rounded-[35px]">
-
-      {/* HEADER */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4">
-
+      {/* ── HEADER ───────────────────────────────────────────────────── */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
         <div>
-
-          <h1 className="text-4xl md:text-5xl font-black text-[#3E2F1C] tracking-tight">
-
+          <h1 style={{ fontSize: 24, fontWeight: 900, color: "#3E2F1C", margin: 0, lineHeight: 1.1 }}>
             Dashboard
-
           </h1>
-
-          <p className="text-[#6B5B4D] mt-1 text-base">
-
+          <p style={{ fontSize: 13, color: "#6B5B4D", margin: "2px 0 0" }}>
             Welcome back, Admin 👋
-
           </p>
-
         </div>
 
-        <div className="flex items-center gap-4">
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {/* date range */}
+          <div style={{
+            display: "flex", alignItems: "center", gap: 6,
+            background: "white", border: "1px solid rgba(200,169,126,0.3)",
+            borderRadius: 14, padding: "6px 14px",
+            boxShadow: "0 2px 6px rgba(0,0,0,0.05)",
+          }}>
+            <Calendar size={13} color="#8B6B43" />
+            <span style={{ fontSize: 12, color: "#3E2F1C", fontWeight: 500 }}>{dateRange}</span>
+          </div>
 
-          {/* NOTIFICATION BUTTON */}
+          {/* notifications */}
           <div className="relative group">
-
-            <button
-              className="
-                bg-white/40
-                backdrop-blur-xl
-                px-5
-                py-3
-                rounded-3xl
-                shadow-2xl
-                border
-                border-white/30
-                flex
-                items-center
-                gap-3
-                hover:scale-105
-                transition-all
-              "
-            >
-
-              <div className="text-2xl">
-
-                🔔
-
+            <button style={{
+              display: "flex", alignItems: "center", gap: 8,
+              background: "white", border: "1px solid rgba(200,169,126,0.3)",
+              borderRadius: 14, padding: "6px 14px",
+              boxShadow: "0 2px 6px rgba(0,0,0,0.05)", cursor: "pointer",
+            }}>
+              <Bell size={13} color="#8B6B43" />
+              <div style={{ textAlign: "left" }}>
+                <p style={{ fontSize: 11, fontWeight: 700, color: "#3E2F1C", margin: 0, lineHeight: 1 }}>Notifications</p>
+                <p style={{ fontSize: 10, color: "#6B5B4D", margin: 0 }}>Expiry & stock alerts</p>
               </div>
-
-              <div className="text-left">
-
-                <h2 className="font-bold text-[#3E2F1C]">
-
-                  Notifications
-
-                </h2>
-
-                <p className="text-xs text-[#6B5B4D]">
-
-                  Product expiry alerts
-
-                </p>
-
-              </div>
-
-              <div
-                className="
-                  bg-red-500
-                  text-white
-                  text-xs
-                  font-bold
-                  w-6
-                  h-6
-                  rounded-full
-                  flex
-                  items-center
-                  justify-center
-                "
-              >
-
-                {expiringProducts.length +
-                  expiredProducts.length}
-
-              </div>
-
+              {alertCount > 0 && (
+                <span style={{
+                  width: 18, height: 18, borderRadius: "50%", background: "#ef4444",
+                  color: "white", fontSize: 9, fontWeight: 700,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>{alertCount}</span>
+              )}
             </button>
-
-            {/* DROPDOWN */}
-            <div
-              className="
-                absolute
-                right-0
-                mt-3
-                w-[350px]
-                bg-white/90
-                backdrop-blur-2xl
-                rounded-3xl
-                shadow-2xl
-                border
-                border-white/30
-                p-5
-                opacity-0
-                invisible
-                group-hover:opacity-100
-                group-hover:visible
-                transition-all
-                duration-300
-                z-50
-              "
-            >
-
-              {/* EXPIRING PRODUCTS */}
+            {/* dropdown */}
+            <div className="absolute right-0 mt-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50"
+              style={{
+                width: 280, background: "white", borderRadius: 20, padding: 14,
+                boxShadow: "0 16px 48px rgba(0,0,0,0.12)", border: "1px solid rgba(200,169,126,0.2)",
+              }}>
               {expiringProducts.length > 0 && (
-
-                <div className="mb-5">
-
-                  <h2 className="text-lg font-bold text-yellow-700 mb-3">
-
-                    ⚠ Expiring Soon
-
-                  </h2>
-
-                  <div className="space-y-3">
-
-                    {expiringProducts.map((product) => (
-
-                      <div
-                        key={product.id}
-
-                        className="
-                          bg-yellow-50
-                          border
-                          border-yellow-200
-                          rounded-2xl
-                          p-3
-                        "
-                      >
-
-                        <h3 className="font-semibold text-[#3E2F1C]">
-
-                          {product.name}
-
-                        </h3>
-
-                        <p className="text-sm text-gray-500">
-
-                          Expiry:
-                          {" "}
-                          {product.expiry_date}
-
-                        </p>
-
-                      </div>
-
-                    ))}
-
-                  </div>
-
-                </div>
-
-              )}
-
-              {/* EXPIRED PRODUCTS */}
-              {expiredProducts.length > 0 && (
-
-                <div>
-
-                  <h2 className="text-lg font-bold text-red-700 mb-3">
-
-                    ❌ Expired Products
-
-                  </h2>
-
-                  <div className="space-y-3">
-
-                    {expiredProducts.map((product) => (
-
-                      <div
-                        key={product.id}
-
-                        className="
-                          bg-red-50
-                          border
-                          border-red-200
-                          rounded-2xl
-                          p-3
-                        "
-                      >
-
-                        <h3 className="font-semibold text-[#3E2F1C]">
-
-                          {product.name}
-
-                        </h3>
-
-                        <p className="text-sm text-gray-500">
-
-                          Expired:
-                          {" "}
-                          {product.expiry_date}
-
-                        </p>
-
-                      </div>
-
-                    ))}
-
-                  </div>
-
-                </div>
-
-              )}
-
-              {/* EMPTY */}
-              {expiringProducts.length === 0 &&
-                expiredProducts.length === 0 && (
-
-                <div className="text-center py-6">
-
-                  <h2 className="text-3xl">
-
-                    ✅
-
-                  </h2>
-
-                  <p className="text-gray-500 mt-2">
-
-                    No expiry notifications
-
-                  </p>
-
-                </div>
-
-              )}
-
-            </div>
-
-          </div>
-
-          {/* BUSINESS OVERVIEW */}
-          <div className="bg-white/40 backdrop-blur-xl px-5 py-3 rounded-3xl shadow-2xl border border-white/30">
-
-            <p className="text-sm text-[#6B5B4D]">
-
-              Mini ERP System
-
-            </p>
-
-            <h2 className="text-2xl font-bold text-[#3E2F1C] mt-1">
-
-              Business Overview
-
-            </h2>
-
-          </div>
-
-        </div>
-
-      </div>
-
-      {/* CARDS */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
-
-        {/* PRODUCTS */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-[#6B4F2A] to-[#8B6B43] text-white p-6 rounded-[32px] shadow-[0_24px_45px_-30px_rgba(0,0,0,0.5)] border border-white/20 hover:-translate-y-1 transition-transform duration-300">
-
-          <div className="absolute right-5 top-5 opacity-10 text-[96px] font-black">
-            P
-          </div>
-
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <p className="text-sm uppercase tracking-[0.24em] text-white/70">Total Products</p>
-              <p className="text-3xl font-bold text-white">{products.length}</p>
-            </div>
-            <Package size={28} className="text-white" />
-          </div>
-          <p className="text-sm text-white/80">Active stock items available for sale.</p>
-        </div>
-
-        {/* CUSTOMERS */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-[#6B4F2A] to-[#8B6B43] text-white p-6 rounded-[32px] shadow-[0_24px_45px_-30px_rgba(0,0,0,0.5)] border border-white/20 hover:-translate-y-1 transition-transform duration-300">
-
-          <div className="absolute right-5 top-5 opacity-10 text-[96px] font-black">
-            C
-          </div>
-
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <p className="text-sm uppercase tracking-[0.24em] text-white/70">Total Customers</p>
-              <p className="text-3xl font-bold text-white">{customers.length}</p>
-            </div>
-            <Users size={28} className="text-white" />
-          </div>
-          <p className="text-sm text-white/80">Registered customer accounts and business contacts.</p>
-        </div>
-
-        {/* SALES */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-[#6B4F2A] to-[#8B6B43] text-white p-6 rounded-[32px] shadow-[0_24px_45px_-30px_rgba(0,0,0,0.5)] border border-white/20 hover:-translate-y-1 transition-transform duration-300">
-
-          <div className="absolute right-5 top-5 opacity-10 text-[96px] font-black">
-            S
-          </div>
-
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <p className="text-sm uppercase tracking-[0.24em] text-white/70">Total Sales</p>
-              <p className="text-3xl font-bold text-white">{sales.length}</p>
-            </div>
-            <ShoppingCart size={28} className="text-white" />
-          </div>
-          <p className="text-sm text-white/80">Completed invoices processed by the system.</p>
-        </div>
-
-        {/* RETURNS */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-[#6B4F2A] to-[#8B6B43] text-white p-6 rounded-[32px] shadow-[0_24px_45px_-30px_rgba(0,0,0,0.5)] border border-white/20 hover:-translate-y-1 transition-transform duration-300">
-
-          <div className="absolute right-5 top-5 opacity-10 text-[96px] font-black">
-            R
-          </div>
-
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <p className="text-sm uppercase tracking-[0.24em] text-white/70">Returned Units</p>
-              <p className="text-3xl font-bold text-white">{returnedProductsCount}</p>
-            </div>
-            <RotateCcw size={28} className="text-white" />
-          </div>
-          <p className="text-sm text-white/80">Products returned to inventory during the current period.</p>
-        </div>
-
-        {/* REVENUE */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-[#6B4F2A] to-[#8B6B43] text-white p-6 rounded-[32px] shadow-[0_24px_45px_-30px_rgba(0,0,0,0.5)] border border-white/20 hover:-translate-y-1 transition-transform duration-300">
-
-          <div className="absolute right-5 top-5 opacity-10 text-[96px] font-black">
-            ₹
-          </div>
-
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <p className="text-sm uppercase tracking-[0.24em] text-white/70">Total Revenue</p>
-              <p className="text-3xl font-bold text-white">₹ {totalRevenue}</p>
-            </div>
-            <IndianRupee size={28} className="text-white" />
-          </div>
-          <p className="text-sm text-white/80">Net sales revenue after returned items are removed from active invoices.</p>
-        </div>
-
-      </div>
-
-      {/* LOWER SECTION */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 mt-4 h-[58vh]">
-
-        {/* SALES ANALYTICS */}
-        <div className="bg-white/40 backdrop-blur-2xl rounded-[35px] shadow-2xl p-5 border border-white/30">
-
-          <div className="mb-4">
-
-            <h2 className="text-2xl font-bold text-[#3E2F1C]">
-
-              Sales Analytics
-
-            </h2>
-
-            <p className="text-[#6B5B4D] mt-1 text-sm">
-
-              Revenue generated by product sales
-
-            </p>
-
-          </div>
-
-          <div className="w-full h-[320px]">
-
-            <ResponsiveContainer width="100%" height="100%">
-
-              <BarChart
-                data={chartData}
-                barCategoryGap="20%"
-              >
-
-                <CartesianGrid
-                  strokeDasharray="4 4"
-                  vertical={false}
-                  stroke="#C8A97E"
-                  opacity={0.5}
-                />
-
-                <XAxis
-                  dataKey="name"
-                  stroke="#6B5B4D"
-                />
-
-                <YAxis
-                  stroke="#6B5B4D"
-                />
-
-                <Tooltip />
-
-                <Bar
-                  dataKey="revenue"
-                  radius={[14, 14, 0, 0]}
-                >
-
-                  {chartData.map((entry, index) => (
-
-                    <Cell
-                      key={`cell-${index}`}
-                      fill={
-                        chartColors[
-                          index % chartColors.length
-                        ]
-                      }
-                    />
-
+                <div style={{ marginBottom: 10 }}>
+                  <p style={{ fontSize: 12, fontWeight: 700, color: "#92400e", marginBottom: 6 }}>⚠ Expiring Soon</p>
+                  {expiringProducts.map(p => (
+                    <div key={p.id} style={{ background: "#fefce8", border: "1px solid #fde68a", borderRadius: 10, padding: "6px 10px", marginBottom: 4 }}>
+                      <p style={{ fontSize: 12, fontWeight: 600, color: "#3E2F1C", margin: 0 }}>{p.name}</p>
+                      <p style={{ fontSize: 10, color: "#6b7280", margin: 0 }}>Expiry: {p.expiry_date}</p>
+                    </div>
                   ))}
-
-                </Bar>
-
-              </BarChart>
-
-            </ResponsiveContainer>
-
+                </div>
+              )}
+              {lowStockProducts.length > 0 && (
+                <div style={{ marginBottom: 10 }}>
+                  <p style={{ fontSize: 12, fontWeight: 700, color: "#b45309", marginBottom: 6 }}>🔻 Low Stock</p>
+                  {lowStockProducts.map(p => (
+                    <div key={p.id} style={{ background: "#fff7ed", border: "1px solid #ffedd5", borderRadius: 10, padding: "6px 10px", marginBottom: 4 }}>
+                      <p style={{ fontSize: 12, fontWeight: 600, color: "#3E2F1C", margin: 0 }}>{p.name}</p>
+                      <p style={{ fontSize: 10, color: "#6b7280", margin: 0 }}>Stock: {p.stock} units</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {expiredProducts.length > 0 && (
+                <div>
+                  <p style={{ fontSize: 12, fontWeight: 700, color: "#b91c1c", marginBottom: 6 }}>❌ Expired</p>
+                  {expiredProducts.map(p => (
+                    <div key={p.id} style={{ background: "#fff1f2", border: "1px solid #fecdd3", borderRadius: 10, padding: "6px 10px", marginBottom: 4 }}>
+                      <p style={{ fontSize: 12, fontWeight: 600, color: "#3E2F1C", margin: 0 }}>{p.name}</p>
+                      <p style={{ fontSize: 10, color: "#6b7280", margin: 0 }}>Expired: {p.expiry_date}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {(expiringProducts.length === 0 && expiredProducts.length === 0 && lowStockProducts.length === 0) && (
+                <p style={{ fontSize: 12, color: "#9ca3af", textAlign: "center", margin: "12px 0" }}>✅ No notifications</p>
+              )}
+            </div>
           </div>
+        </div>
+      </div>
 
+      {/* ── STAT CARDS ───────────────────────────────────────────────── */}
+      <div style={{
+        display: "grid", gridTemplateColumns: "repeat(5, 1fr)",
+        gap: 10, flexShrink: 0,
+      }}>
+        {stats.map((card, i) => (
+          <div key={i} style={{
+            background: "linear-gradient(135deg, #6B4F2A 0%, #8B6B43 100%)",
+            borderRadius: 22, padding: "14px 16px",
+            boxShadow: "0 8px 24px rgba(107,79,42,0.22)",
+            transition: "transform 0.2s",
+          }}
+            onMouseEnter={e => e.currentTarget.style.transform = "translateY(-2px)"}
+            onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
+              <p style={{
+                fontSize: 9, letterSpacing: "0.14em", textTransform: "uppercase",
+                color: "rgba(255,255,255,0.55)", margin: 0, whiteSpace: "pre-line", lineHeight: 1.4,
+              }}>{card.label}</p>
+              <span style={{ color: "rgba(255,255,255,0.65)", marginTop: 1 }}>{card.icon}</span>
+            </div>
+            <p style={{ fontSize: 26, fontWeight: 900, color: "white", margin: "0 0 4px", lineHeight: 1 }}>
+              {card.value}
+            </p>
+            <p style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", margin: 0, lineHeight: 1.4 }}>
+              {card.desc}
+            </p>
+          </div>
+        ))}
+      </div>
+
+      {/* ── MIDDLE ROW: Area + Donut ──────────────────────────────────── */}
+      <div style={{
+        display: "grid", gridTemplateColumns: "2fr 1fr",
+        gap: 10, flex: 1, minHeight: 0,
+      }}>
+
+        {/* Area chart */}
+        <div style={{
+          background: "white", borderRadius: 24,
+          border: "1px solid rgba(200,169,126,0.2)",
+          boxShadow: "0 4px 16px rgba(0,0,0,0.04)",
+          padding: "14px 16px", display: "flex", flexDirection: "column",
+        }}>
+          <div style={{ display: "flex", gap: 16, marginBottom: 8, flexShrink: 0 }}>
+            {top2.map((name, i) => (
+              <div key={name} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <div style={{ width: 9, height: 9, borderRadius: "50%", background: AREA_COLORS[i] }} />
+                <span style={{ fontSize: 12, color: "#3E2F1C", fontWeight: 500 }}>{name}</span>
+              </div>
+            ))}
+            {top2.length === 0 && <span style={{ fontSize: 12, color: "#9ca3af" }}>No sales yet</span>}
+          </div>
+          <div style={{ flex: 1, minHeight: 0 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={areaData} margin={{ top: 4, right: 4, left: -28, bottom: 0 }}>
+                <defs>
+                  {top2.map((name, i) => (
+                    <linearGradient key={name} id={`ag${i}`} x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%"  stopColor={AREA_COLORS[i]} stopOpacity={0.35} />
+                      <stop offset="95%" stopColor={AREA_COLORS[i]} stopOpacity={0} />
+                    </linearGradient>
+                  ))}
+                </defs>
+                <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#E8DCCB" opacity={0.5} />
+                <XAxis dataKey="name" stroke="#6B5B4D" tick={{ fontSize: 10 }} />
+                <YAxis stroke="#6B5B4D" tick={{ fontSize: 10 }} />
+                <Tooltip contentStyle={{ borderRadius: 10, border: "1px solid #E8DCCB", fontSize: 11 }} />
+                {top2.map((name, i) => (
+                  <Area key={name} type="monotone" dataKey={name}
+                    stroke={AREA_COLORS[i]} strokeWidth={2.5}
+                    fill={`url(#ag${i})`} />
+                ))}
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
         </div>
 
-        {/* RECENT SALES */}
-        <div className="bg-white/40 backdrop-blur-2xl rounded-[35px] shadow-2xl p-5 border border-white/30 overflow-hidden">
-
-          <div className="mb-4">
-
-            <h2 className="text-2xl font-bold text-[#3E2F1C]">
-
-              Recent Sales
-
-            </h2>
-
-            <p className="text-[#6B5B4D] mt-1 text-sm">
-
-              Latest customer transactions
-
-            </p>
-
-          </div>
-
-          <div className="overflow-auto h-[240px] rounded-2xl">
-
-            <table className="w-full">
-
-              <thead>
-
-                <tr className="bg-white/50 text-[#5A4632] sticky top-0">
-
-                  <th className="py-3 px-4 text-left rounded-l-2xl">
-
-                    Customer
-
-                  </th>
-
-                  <th className="py-3 px-4 text-left">
-
-                    Product
-
-                  </th>
-
-                  <th className="py-3 px-4 text-left">
-
-                    Quantity
-
-                  </th>
-
-                  <th className="py-3 px-4 text-left rounded-r-2xl">
-
-                    Total
-
-                  </th>
-
-                </tr>
-
-              </thead>
-
-              <tbody>
-
-                {sales.slice(-5).reverse().map((sale) => (
-
-                  <tr
-                    key={sale.id}
-
-                    className="
-                      border-b
-                      border-white/20
-                      hover:bg-white/20
-                      transition-all
-                    "
+        {/* Donut chart */}
+        <div style={{
+          background: "white", borderRadius: 24,
+          border: "1px solid rgba(200,169,126,0.2)",
+          boxShadow: "0 4px 16px rgba(0,0,0,0.04)",
+          padding: "14px 16px", display: "flex", flexDirection: "column",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minHeight: 0 }}>
+            {/* donut */}
+            <div style={{ position: "relative", width: 120, height: 120, flexShrink: 0 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={donutData.length > 0 ? donutData : [{ name: "No data", value: 1, color: "#E8DCCB" }]}
+                    cx="50%" cy="50%" innerRadius={38} outerRadius={55}
+                    dataKey="value" strokeWidth={0}
                   >
-
-                    <td className="py-3 px-4 font-semibold text-[#3E2F1C]">
-
-                      {sale.customer}
-
-                    </td>
-
-                    <td className="px-4 text-[#5A4632]">
-
-                      {sale.product}
-
-                    </td>
-
-                    <td className="px-4 text-[#5A4632]">
-
-                      {sale.quantity}
-
-                    </td>
-
-                    <td className="px-4 font-bold text-[#8B6B43]">
-
-                      ₹ {sale.total}
-
-                    </td>
-
-                  </tr>
-
-                ))}
-
-              </tbody>
-
-            </table>
-
-          </div>
-
-          <div className="mt-6 bg-[#F7F3EA] rounded-[28px] border border-[#E8DCCB] p-5">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="text-xl font-bold text-[#3E2F1C]">Recent Returns</h3>
-                <p className="text-sm text-[#6B5B4D]">Track products returned to inventory.</p>
-              </div>
-              <div className="text-right">
-                <p className="text-xs uppercase tracking-[0.24em] text-[#8B7B6B]">Returned value</p>
-                <p className="text-lg font-semibold text-[#3E2F1C]">₹ {returnedRevenue}</p>
+                    {(donutData.length > 0 ? donutData : [{ color: "#E8DCCB" }]).map((d, i) => (
+                      <Cell key={i} fill={d.color} />
+                    ))}
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+              <div style={{
+                position: "absolute", inset: 0,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                pointerEvents: "none",
+              }}>
+                <span style={{ fontSize: 16, fontWeight: 900, color: "#3E2F1C" }}>{top2Pct}%</span>
               </div>
             </div>
 
-            {returns.length > 0 ? (
-              <div className="space-y-3">
-                {returns.slice(0, 4).map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex items-center justify-between rounded-3xl bg-white p-3 shadow-sm border border-[#E8DCCB]"
-                  >
-                    <div>
-                      <p className="font-semibold text-[#3E2F1C]">{item.product}</p>
-                      <p className="text-sm text-[#6B5B4D]">{item.customer}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-semibold text-[#8B6B43]">{item.quantity} units</p>
-                      <p className="text-sm text-[#6B5B4D]">₹ {item.total}</p>
-                    </div>
+            {/* legend */}
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 5 }}>
+              {donutData.map((d, i) => (
+                <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: d.color, flexShrink: 0 }} />
+                    <span style={{ fontSize: 12, color: "#3E2F1C", fontWeight: 500 }}>{d.name}</span>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-10 text-[#6B5B4D]">
-                No recent returns recorded.
-              </div>
-            )}
+                  <span style={{ fontSize: 11, color: "#6B5B4D" }}>₹ {d.value.toFixed(0)} ({d.pct}%)</span>
+                </div>
+              ))}
+              {donutData.length === 0 && <p style={{ fontSize: 12, color: "#9ca3af" }}>No sales data</p>}
+            </div>
           </div>
 
+          <button style={{
+            marginTop: 10, width: "100%",
+            background: "linear-gradient(135deg, #6B4F2A, #8B6B43)",
+            color: "white", border: "none", borderRadius: 16, padding: "9px 0",
+            fontSize: 13, fontWeight: 700, cursor: "pointer", flexShrink: 0,
+          }}
+            onMouseEnter={e => e.currentTarget.style.opacity = "0.9"}
+            onMouseLeave={e => e.currentTarget.style.opacity = "1"}
+          >
+            Check Now
+          </button>
+        </div>
+      </div>
+
+      {/* ── BOTTOM ROW: Bar chart + Recent Sales ─────────────────────── */}
+      <div style={{
+        display: "grid", gridTemplateColumns: "1fr 1fr",
+        gap: 10, flex: 1, minHeight: 0,
+      }}>
+
+        {/* Sales Analytics */}
+        <div style={{
+          background: "white", borderRadius: 24,
+          border: "1px solid rgba(200,169,126,0.2)",
+          boxShadow: "0 4px 16px rgba(0,0,0,0.04)",
+          padding: "14px 16px", display: "flex", flexDirection: "column",
+        }}>
+          <div style={{ flexShrink: 0, marginBottom: 4 }}>
+            <h2 style={{ fontSize: 15, fontWeight: 700, color: "#3E2F1C", margin: 0 }}>Sales Analytics</h2>
+            <p style={{ fontSize: 11, color: "#6B5B4D", margin: "2px 0 0" }}>Revenue generated by product sales</p>
+          </div>
+          <div style={{ flex: 1, minHeight: 0 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={barData} barCategoryGap="28%" margin={{ top: 4, right: 4, left: -28, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#E8DCCB" opacity={0.6} />
+                <XAxis dataKey="name" stroke="#6B5B4D" tick={{ fontSize: 10 }} />
+                <YAxis stroke="#6B5B4D" tick={{ fontSize: 10 }} />
+                <Tooltip contentStyle={{ borderRadius: 10, border: "1px solid #E8DCCB", fontSize: 11 }} />
+                <Bar dataKey="revenue" radius={[8, 8, 0, 0]}>
+                  {barData.map((_, i) => (
+                    <Cell key={i} fill={BAR_COLORS[i % BAR_COLORS.length]} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Recent Sales */}
+        <div style={{
+          background: "white", borderRadius: 24,
+          border: "1px solid rgba(200,169,126,0.2)",
+          boxShadow: "0 4px 16px rgba(0,0,0,0.04)",
+          padding: "14px 16px", display: "flex", flexDirection: "column",
+          overflow: "hidden",
+        }}>
+          <div style={{ flexShrink: 0, marginBottom: 8 }}>
+            <h2 style={{ fontSize: 15, fontWeight: 700, color: "#3E2F1C", margin: 0 }}>Recent Sales</h2>
+            <p style={{ fontSize: 11, color: "#6B5B4D", margin: "2px 0 0" }}>Latest customer transactions</p>
+          </div>
+          <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr style={{ borderBottom: "1px solid rgba(200,169,126,0.25)", position: "sticky", top: 0, background: "white" }}>
+                  {["Customer", "Product", "Qty", "Total"].map(h => (
+                    <th key={h} style={{
+                      textAlign: "left", paddingBottom: 6, paddingRight: 10,
+                      fontSize: 11, fontWeight: 600, color: "#5A4632",
+                    }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {sales.slice(-6).reverse().map(sale => (
+                  <tr key={sale.id} style={{ borderBottom: "1px solid rgba(200,169,126,0.1)" }}>
+                    <td style={{ padding: "7px 10px 7px 0", fontSize: 12, fontWeight: 600, color: "#3E2F1C" }}>{sale.customer}</td>
+                    <td style={{ padding: "7px 10px 7px 0", fontSize: 12, color: "#5A4632" }}>{sale.product}</td>
+                    <td style={{ padding: "7px 10px 7px 0", fontSize: 12, color: "#5A4632" }}>{sale.quantity}</td>
+                    <td style={{ padding: "7px 0",           fontSize: 12, fontWeight: 700, color: "#8B6B43" }}>₹ {sale.total}</td>
+                  </tr>
+                ))}
+                {sales.length === 0 && (
+                  <tr><td colSpan={4} style={{ textAlign: "center", padding: "20px 0", fontSize: 12, color: "#9ca3af" }}>No sales recorded yet.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
 
       </div>
-
     </div>
-
   );
 }
-
-export default Dashboard;

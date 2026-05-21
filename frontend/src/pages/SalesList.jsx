@@ -178,7 +178,7 @@ function SalesList() {
 
   return (
 
-    <div className="h-screen overflow-hidden bg-gradient-to-br from-[#F5F0E6] via-[#E8DCCB] to-[#D6C2A8] p-4 rounded-[35px]">
+    <div className="min-h-full overflow-auto bg-gradient-to-br from-[#F5F0E6] via-[#E8DCCB] to-[#D6C2A8] p-4 rounded-[35px]">
 
       {/* HEADER */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-5">

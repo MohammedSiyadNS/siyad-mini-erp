@@ -7,6 +7,7 @@ import {
   Pencil,
   Trash2,
   UserPlus,
+  Search,
 } from "lucide-react";
 
 function Customers() {
@@ -18,6 +19,7 @@ function Customers() {
   const [place, setPlace] = useState("");
 
   const [editId, setEditId] = useState(null);
+  const [query, setQuery] = useState("");
 
   // FETCH CUSTOMERS
   const fetchCustomers = () => {
@@ -124,7 +126,7 @@ function Customers() {
 
   return (
 
-    <div className="h-screen overflow-hidden bg-gradient-to-br from-[#F5F0E6] via-[#E8DCCB] to-[#D6C2A8] p-3 rounded-3xl">
+    <div className="min-h-full overflow-auto bg-gradient-to-br from-[#F5F0E6] via-[#E8DCCB] to-[#D6C2A8] p-3 rounded-3xl">
 
       {/* HEADER */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-5">
@@ -370,19 +372,22 @@ function Customers() {
       {/* TABLE */}
       <div className="mt-5 bg-white/40 backdrop-blur-xl rounded-[30px] shadow-2xl p-5 border border-white/30 overflow-x-auto h-[62vh]">
 
-        <div className="mb-4">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-2xl font-bold text-[#3E2F1C]">Customer Records</h2>
+            <p className="text-[#6B5B4D] mt-1">All registered customers</p>
+          </div>
 
-          <h2 className="text-2xl font-bold text-[#3E2F1C]">
-
-            Customer Records
-
-          </h2>
-
-          <p className="text-[#6B5B4D] mt-1">
-
-            All registered customers
-
-          </p>
+          <div className="relative w-full md:w-64">
+            <Search className="absolute left-3 top-3 text-[#8B6B43]" size={16} />
+            <input
+              type="text"
+              placeholder="Search customers..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="w-full bg-white/80 border border-[#E8DCCB] rounded-full py-2.5 pl-10 pr-4 text-sm text-[#3E2F1C] placeholder-[#8B7B6B]/70 focus:outline-none"
+            />
+          </div>
 
         </div>
 
@@ -428,7 +433,18 @@ function Customers() {
 
           <tbody>
 
-            {customers.map((customer) => (
+            {customers
+              .filter((c) => {
+                if (!query) return true;
+                const q = query.toLowerCase();
+                return (
+                  String(c.id).includes(q) ||
+                  (c.name || "").toLowerCase().includes(q) ||
+                  (c.phone || "").toLowerCase().includes(q) ||
+                  (c.place || "").toLowerCase().includes(q)
+                );
+              })
+              .map((customer) => (
 
               <tr
                 key={customer.id}

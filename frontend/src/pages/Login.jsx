@@ -14,6 +14,7 @@ function Login() {
 
     if (username === "admin" && password === "1234") {
       localStorage.setItem("isLoggedIn", "true");
+      localStorage.setItem("username", username);
       navigate("/");
     } else {
       setError("Invalid Username or Password");

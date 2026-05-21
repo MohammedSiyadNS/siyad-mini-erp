@@ -1,281 +1,174 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import {
+  LayoutDashboard,
+  Package,
+  Users,
+  ShoppingCart,
+  ClipboardList,
+  Settings,
+  ChevronDown,
+} from "lucide-react";
 
 function Sidebar() {
-
   const location = useLocation();
-
   const navigate = useNavigate();
 
   const handleLogout = () => {
-
     localStorage.removeItem("isLoggedIn");
-
+    localStorage.removeItem("username");
     navigate("/login");
-
   };
 
+  const username = localStorage.getItem("username") || "Admin";
+  const initial = username.charAt(0).toUpperCase();
+
   const menuItems = [
+    { name: "Dashboard", path: "/", Icon: LayoutDashboard },
+    { name: "Products", path: "/products", Icon: Package },
+    { name: "Customers", path: "/customers", Icon: Users },
+    { name: "New Sale", path: "/new-sale", Icon: ShoppingCart },
+    { name: "Sales List", path: "/sales-list", Icon: ClipboardList },
+  ];
 
-    {
-      name: "Dashboard",
-      path: "/",
-      icon: "📊",
-    },
-
-    {
-      name: "Products",
-      path: "/products",
-      icon: "📦",
-    },
-
-    {
-      name: "Customers",
-      path: "/customers",
-      icon: "👥",
-    },
-
-    {
-      name: "New Sale",
-      path: "/new-sale",
-      icon: "💰",
-    },
-
-    {
-      name: "Sales List",
-      path: "/sales-list",
-      icon: "🧾",
-    },
-
+  const accountItems = [
+    { name: "About us", path: "/about", Icon: Settings },
   ];
 
   return (
-
-    <div className="
-      w-72
-      h-full
-      bg-gradient-to-b
-      from-[#F5F0E6]
-      via-[#E8DCCB]
-      to-[#D6C2A8]
-      text-[#3E2F1C]
-      flex
-      flex-col
-      justify-between
-      p-5
-      shadow-2xl
-      border-r
-      border-white/30
-    ">
-
-      {/* TOP SECTION */}
-      <div>
-
-        {/* LOGO */}
-        <div className="mb-8">
-
-          <div className="
-            bg-white/40
-            backdrop-blur-xl
-            rounded-[28px]
-            p-5
-            shadow-xl
-            border
-            border-white/30
-          ">
-
-            <h1 className="
-              text-3xl
-              font-black
-              tracking-wide
-              text-[#3E2F1C]
-            ">
-
-              AL AMANA GROCERY
-            </h1>
-
-            <p className="
-              text-[#6B5B4D]
-              text-sm
-              mt-2
-            ">
-
-              Business Management System
-
-            </p>
-
-          </div>
-
-        </div>
-
-        {/* MENU */}
-        <div className="flex flex-col gap-3">
-
-          {menuItems.map((item) => (
-
-            <Link
-              key={item.path}
-              to={item.path}
-
-              className={`group
-                flex
-                items-center
-                gap-4
-                px-5
-                py-4
-                rounded-[24px]
-                transition-all
-                duration-300
-                text-[17px]
-                font-medium
-
-                ${
-                  location.pathname === item.path
-                    ? "bg-gradient-to-r from-[#8B6B43] to-[#C8A97E] text-white shadow-2xl"
-                    : "bg-white/20 hover:bg-white/40 text-[#5A4632]"
-                }
-              `}
-            >
-
-              <div className={`
-                w-11
-                h-11
-                rounded-2xl
-                flex
-                items-center
-                justify-center
-                text-xl
-
-                ${
-                  location.pathname === item.path
-                    ? "bg-white/20"
-                    : "bg-[#C8A97E]/20"
-                }
-              `}>
-
-                {item.icon}
-
-              </div>
-
-              <span>
-
-                {item.name}
-
-              </span>
-
-            </Link>
-
-          ))}
-
-        </div>
-
-      </div>
-
-      {/* BOTTOM SECTION */}
-      <div className="space-y-4">
-
-        {/* ADMIN CARD */}
-        <div className="
-          bg-white/40
-          backdrop-blur-xl
-          p-5
-          rounded-[28px]
-          border
-          border-white/30
-          shadow-xl
-        ">
-
-          <p className="
-            text-sm
-            text-[#6B5B4D]
-          ">
-
-            Logged in as
-
-          </p>
-
-          <div className="
-            flex
-            items-center
-            gap-3
-            mt-3
-          ">
-
-            <div className="
-              w-12
-              h-12
-              rounded-2xl
-              bg-gradient-to-r
-              from-[#8B6B43]
-              to-[#C8A97E]
-              flex
-              items-center
-              justify-center
-              text-white
-              font-bold
-              text-lg
-              shadow-lg
-            ">
-
-              A
-
-            </div>
-
-            <div>
-
-              <h2 className="
-                font-bold
-                text-lg
-                text-[#3E2F1C]
-              ">
-
-                Admin
-
-              </h2>
-
-              <p className="
-                text-sm
-                text-[#6B5B4D]
-              ">
-
-                System Administrator
-
-              </p>
-
-            </div>
-
-          </div>
-
-        </div>
-
-        {/* LOGOUT BUTTON */}
-        <button
-          onClick={handleLogout}
-
-          className="
-            w-full
-            bg-gradient-to-r
-            from-red-500
-            to-pink-600
-            hover:scale-[1.02]
-            transition-all
-            duration-300
-            text-white
-            py-4
-            rounded-[24px]
-            font-semibold
-            shadow-2xl
-            tracking-wide
-          "
+    <div
+      className="fixed left-0 top-0 bottom-0 flex flex-col p-5"
+      style={{
+        width: "220px",
+        background: "linear-gradient(180deg, #2C1608 0%, #3D2010 100%)",
+        color: "white",
+        zIndex: 20,
+      }}
+    >
+      {/* LOGO */}
+      <div className="flex items-center gap-3 mb-8">
+        <div
+          className="flex items-center justify-center flex-shrink-0 rounded-xl"
+          style={{ width: 36, height: 36, background: "#6B4F2A" }}
         >
-
-          Logout
-
-        </button>
-
+          <ShoppingCart size={18} color="white" />
+        </div>
+        <div>
+          <p className="font-black text-white leading-tight" style={{ fontSize: 11 }}>
+            AL AMANA
+          </p>
+          <p className="font-black text-white leading-tight" style={{ fontSize: 11 }}>
+            GROCERY
+          </p>
+          <p style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", marginTop: 2 }}>
+            Business Management System
+          </p>
+        </div>
       </div>
 
-    </div>
+      {/* MAIN MENU */}
+      <nav className="flex flex-col gap-0.5">
+        {menuItems.map(({ name, path, Icon }) => {
+          const isActive = location.pathname === path;
+          return (
+            <Link
+              key={path}
+              to={path}
+              className="flex items-center gap-3 rounded-xl transition-all duration-200"
+              style={{
+                padding: "10px 12px",
+                fontSize: 14,
+                fontWeight: 500,
+                backgroundColor: isActive ? "#8B6B43" : "transparent",
+                color: isActive ? "white" : "rgba(255,255,255,0.5)",
+                textDecoration: "none",
+              }}
+              onMouseEnter={e => {
+                if (!isActive) {
+                  e.currentTarget.style.color = "rgba(255,255,255,0.8)";
+                  e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.06)";
+                }
+              }}
+              onMouseLeave={e => {
+                if (!isActive) {
+                  e.currentTarget.style.color = "rgba(255,255,255,0.5)";
+                  e.currentTarget.style.backgroundColor = "transparent";
+                }
+              }}
+            >
+              <Icon size={18} />
+              <span>{name}</span>
+            </Link>
+          );
+        })}
+      </nav>
 
+      {/* ACCOUNT SECTION */}
+      <div className="mt-8 flex-1">
+        <p
+          className="uppercase px-3 mb-2"
+          style={{ fontSize: 9, letterSpacing: "0.2em", color: "rgba(255,255,255,0.3)" }}
+        >
+          Account
+        </p>
+        <div className="flex flex-col gap-0.5">
+          {accountItems.map(({ name, path, Icon }) => (
+            <Link
+              key={path}
+              to={path}
+              className="flex items-center gap-3 rounded-xl transition-all duration-200"
+              style={{
+                padding: "10px 12px",
+                fontSize: 14,
+                fontWeight: 500,
+                color: "rgba(255,255,255,0.5)",
+                textDecoration: "none",
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.color = "rgba(255,255,255,0.8)";
+                e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.06)";
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.color = "rgba(255,255,255,0.5)";
+                e.currentTarget.style.backgroundColor = "transparent";
+              }}
+            >
+              <Icon size={18} />
+              <span>{name}</span>
+            </Link>
+          ))}
+        </div>
+      </div>
+
+      {/* ADMIN CARD (click to logout) */}
+      <button
+        onClick={handleLogout}
+        className="flex items-center gap-3 rounded-2xl w-full text-left transition-all"
+        style={{ background: "#4A2C14", padding: "12px" }}
+        title="Click to logout"
+        onMouseEnter={e => (e.currentTarget.style.background = "#5A3A1A")}
+        onMouseLeave={e => (e.currentTarget.style.background = "#4A2C14")}
+      >
+        <div
+          className="flex items-center justify-center flex-shrink-0 rounded-xl font-bold capitalize"
+          style={{
+            width: 36,
+            height: 36,
+            background: "linear-gradient(135deg, #8B6B43, #C8A97E)",
+            color: "white",
+            fontSize: 14,
+          }}
+        >
+          {initial}
+        </div>
+        <div className="flex-1 min-w-0 text-left">
+          <p className="font-bold capitalize truncate" style={{ fontSize: 13, color: "white" }}>
+            {username}
+          </p>
+          <p style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>System Administrator</p>
+        </div>
+        <ChevronDown size={14} color="rgba(255,255,255,0.3)" />
+      </button>
+    </div>
   );
 }
 
