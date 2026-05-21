@@ -6,8 +6,9 @@ import {
   ShoppingCart,
   ClipboardList,
   Settings,
-  ChevronDown,
+  LogOut,
 } from "lucide-react";
+
 
 function Sidebar() {
   const location = useLocation();
@@ -136,17 +137,37 @@ function Sidebar() {
               <span>{name}</span>
             </Link>
           ))}
+
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-3 rounded-xl transition-all duration-200 text-left w-full cursor-pointer"
+            style={{
+              padding: "10px 12px",
+              fontSize: 14,
+              fontWeight: 500,
+              color: "rgba(255,255,255,0.5)",
+              background: "transparent",
+              border: "none",
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.color = "#FF6B6B";
+              e.currentTarget.style.backgroundColor = "rgba(255, 107, 107, 0.08)";
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.color = "rgba(255,255,255,0.5)";
+              e.currentTarget.style.backgroundColor = "transparent";
+            }}
+          >
+            <LogOut size={18} />
+            <span>Log Out</span>
+          </button>
         </div>
       </div>
 
-      {/* ADMIN CARD (click to logout) */}
-      <button
-        onClick={handleLogout}
-        className="flex items-center gap-3 rounded-2xl w-full text-left transition-all"
+      {/* ADMIN CARD */}
+      <div
+        className="flex items-center gap-3 rounded-2xl w-full text-left"
         style={{ background: "#4A2C14", padding: "12px" }}
-        title="Click to logout"
-        onMouseEnter={e => (e.currentTarget.style.background = "#5A3A1A")}
-        onMouseLeave={e => (e.currentTarget.style.background = "#4A2C14")}
       >
         <div
           className="flex items-center justify-center flex-shrink-0 rounded-xl font-bold capitalize"
@@ -166,8 +187,7 @@ function Sidebar() {
           </p>
           <p style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>System Administrator</p>
         </div>
-        <ChevronDown size={14} color="rgba(255,255,255,0.3)" />
-      </button>
+      </div>
     </div>
   );
 }
