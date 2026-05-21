@@ -42,6 +42,30 @@ async function ensureSyncedColumns() {
       await pool.query(
         `UPDATE ${t} SET server_timestamp = CURRENT_TIMESTAMP WHERE server_timestamp IS NULL;`
       );
+      // Ensure specific custom data columns also exist in remote PG
+      if (t === "products") {
+        await pool.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS name TEXT;`);
+        await pool.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS price NUMERIC;`);
+        await pool.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS stock INTEGER;`);
+        await pool.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS expiry_date TEXT;`);
+      } else if (t === "sales") {
+        await pool.query(`ALTER TABLE sales ADD COLUMN IF NOT EXISTS customer TEXT;`);
+        await pool.query(`ALTER TABLE sales ADD COLUMN IF NOT EXISTS product TEXT;`);
+        await pool.query(`ALTER TABLE sales ADD COLUMN IF NOT EXISTS quantity INTEGER;`);
+        await pool.query(`ALTER TABLE sales ADD COLUMN IF NOT EXISTS total NUMERIC;`);
+        await pool.query(`ALTER TABLE sales ADD COLUMN IF NOT EXISTS sale_date TEXT;`);
+      } else if (t === "customers") {
+        await pool.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS name TEXT;`);
+        await pool.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS phone TEXT;`);
+        await pool.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS place TEXT;`);
+      } else if (t === "returns") {
+        await pool.query(`ALTER TABLE returns ADD COLUMN IF NOT EXISTS sale_id INTEGER;`);
+        await pool.query(`ALTER TABLE returns ADD COLUMN IF NOT EXISTS customer TEXT;`);
+        await pool.query(`ALTER TABLE returns ADD COLUMN IF NOT EXISTS product TEXT;`);
+        await pool.query(`ALTER TABLE returns ADD COLUMN IF NOT EXISTS quantity INTEGER;`);
+        await pool.query(`ALTER TABLE returns ADD COLUMN IF NOT EXISTS total NUMERIC;`);
+        await pool.query(`ALTER TABLE returns ADD COLUMN IF NOT EXISTS return_date TEXT;`);
+      }
       console.log(`Ensured PG synced/deleted/timestamp columns and default values on ${t}`);
     } catch (err) {
       // If table doesn't exist in Postgres, create it with a compatible schema
@@ -190,7 +214,21 @@ ensureSyncedColumns().catch((err) => {
 async function pushToPostgres(tableName, localRecord, dataCols) {
   const pgCols = ['id', ...dataCols, 'deleted', 'synced'];
   const placeholders = pgCols.map((_, idx) => `$${idx + 1}`).join(', ');
-  const values = [...pgCols.slice(0, -1).map(c => localRecord[c]), 1];
+  const values = [
+    ...pgCols.slice(0, -1).map(c => {
+      let val = localRecord[c];
+      if (c && c.endsWith('_date') && val) {
+        const num = Number(val);
+        if (!isNaN(num) && num > 100000000000) { // check if valid epoch ms timestamp
+          try {
+            return new Date(num).toISOString().split('T')[0];
+          } catch (e) {}
+        }
+      }
+      return val;
+    }),
+    1
+  ];
   const query = `
     INSERT INTO ${tableName} (${pgCols.join(', ')}, server_timestamp)
     VALUES (${placeholders}, CURRENT_TIMESTAMP)
