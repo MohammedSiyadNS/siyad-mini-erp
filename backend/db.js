@@ -9,7 +9,12 @@ const pool = new Pool({
   },
 });
 
-pool.connect()
+// Handle unexpected errors on idle clients inside the pg pool to prevent process crashes
+pool.on("error", (err) => {
+  console.error("Unexpected error on idle PostgreSQL client:", err.message || err);
+});
+
+pool.query("SELECT 1")
   .then(() => {
     console.log("PostgreSQL Connected");
   })
