@@ -68,65 +68,76 @@ function Products() {
   expiry_date: expiryDate,
 };
 
-    // UPDATE
-    if (editId) {
+    // UPDATE / ADD
+    try {
+      if (editId) {
+        const response = await fetch(
+          `http://localhost:5000/products/${editId}`,
+          {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(productData),
+          }
+        );
 
-      await fetch(
-        `http://localhost:5000/products/${editId}`,
-        {
-          method: "PUT",
-
-          headers: {
-            "Content-Type": "application/json",
-          },
-
-          body: JSON.stringify(productData),
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.error || "Failed to update product");
         }
-      );
 
-      setEditId(null);
+        setEditId(null);
+      } else {
+        const response = await fetch(
+          "http://localhost:5000/products",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(productData),
+          }
+        );
 
-    }
-
-    // ADD
-    else {
-
-      await fetch(
-        "http://localhost:5000/products",
-        {
-          method: "POST",
-
-          headers: {
-            "Content-Type": "application/json",
-          },
-
-          body: JSON.stringify(productData),
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.error || "Failed to add product");
         }
-      );
+      }
 
+      setName("");
+      setPrice("");
+      setStock("");
+      setExpiryDate("");
+      fetchProducts();
+    } catch (err) {
+      alert("Error: " + err.message);
     }
-
-    setName("");
-    setPrice("");
-    setStock("");
-    setExpiryDate("");
-
-    fetchProducts();
-
   };
 
   // DELETE PRODUCT
   const deleteProduct = async (id) => {
+    if (!confirm("Are you sure you want to delete this product?")) {
+      return;
+    }
+    try {
+      const response = await fetch(
+        `http://localhost:5000/products/${id}`,
+        {
+          method: "DELETE",
+        }
+      );
 
-    await fetch(
-      `http://localhost:5000/products/${id}`,
-      {
-        method: "DELETE",
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || "Failed to delete product");
       }
-    );
 
-    fetchProducts();
-
+      fetchProducts();
+    } catch (err) {
+      alert("Error: " + err.message);
+    }
   };
 
   // EDIT PRODUCT

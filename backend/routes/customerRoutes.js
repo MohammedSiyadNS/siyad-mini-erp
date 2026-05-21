@@ -1,9 +1,7 @@
 const express = require("express");
 const router = express.Router();
 
-const sqlite3 = require("sqlite3").verbose();
-
-const db = new sqlite3.Database("./erp.db");
+const db = require("../sqliteDb");
 
 // CREATE TABLE
 db.run(`

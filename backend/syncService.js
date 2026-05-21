@@ -1,8 +1,6 @@
-const sqlite3 = require("sqlite3").verbose();
 const pool = require("./db");
 const { isOnline } = require("./network");
-
-const db = new sqlite3.Database("./erp.db");
+const db = require("./sqliteDb");
 
 // Helper to compare database values safely across SQLite and Postgres type differences.
 // Postgres NUMERIC returns "7.00" while SQLite INTEGER returns 7 — these must be equal.
@@ -364,17 +362,11 @@ async function syncTable(tableName, dataCols) {
             }
           }
         } else if (!localSynced) {
-          // Local has pending unsynced changes — apply LWW by server timestamp
-          if (localTime > remoteTime) {
-            // Local is newer — push to Postgres
-            const newTimestamp = await pushToPostgres(tableName, local, dataCols);
-            await markLocalSynced(tableName, id, newTimestamp);
-            console.log(`LWW: ID ${id} pushed to server (local was newer)`);
-          } else {
-            // Remote is newer or equal — remote wins
-            await updateLocalRecord(tableName, remote, 1, remote.server_timestamp);
-            console.log(`LWW: ID ${id} pulled from server (remote was newer)`);
-          }
+          // Local has pending unsynced changes — always push to Postgres.
+          // This avoids clock skew reverting local edits.
+          const newTimestamp = await pushToPostgres(tableName, local, dataCols);
+          await markLocalSynced(tableName, id, newTimestamp);
+          console.log(`Pushed unsynced local changes for ID ${id} to server`);
         } else {
           // Both synced — only compare data columns and deleted flag, NOT timestamp.
           // Timestamp comparison is excluded because Postgres microsecond precision

@@ -53,64 +53,75 @@ function Customers() {
       place,
     };
 
-    // UPDATE
-    if (editId) {
+    // UPDATE / ADD
+    try {
+      if (editId) {
+        const response = await fetch(
+          `http://localhost:5000/customers/${editId}`,
+          {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(customerData),
+          }
+        );
 
-      await fetch(
-        `http://localhost:5000/customers/${editId}`,
-        {
-          method: "PUT",
-
-          headers: {
-            "Content-Type": "application/json",
-          },
-
-          body: JSON.stringify(customerData),
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.error || "Failed to update customer");
         }
-      );
 
-      setEditId(null);
+        setEditId(null);
+      } else {
+        const response = await fetch(
+          "http://localhost:5000/customers",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(customerData),
+          }
+        );
 
-    }
-
-    // ADD
-    else {
-
-      await fetch(
-        "http://localhost:5000/customers",
-        {
-          method: "POST",
-
-          headers: {
-            "Content-Type": "application/json",
-          },
-
-          body: JSON.stringify(customerData),
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.error || "Failed to add customer");
         }
-      );
+      }
 
+      setName("");
+      setPhone("");
+      setPlace("");
+      fetchCustomers();
+    } catch (err) {
+      alert("Error: " + err.message);
     }
-
-    setName("");
-    setPhone("");
-    setPlace("");
-
-    fetchCustomers();
-
   };
 
   // DELETE CUSTOMER
   const deleteCustomer = async (id) => {
+    if (!confirm("Are you sure you want to delete this customer?")) {
+      return;
+    }
+    try {
+      const response = await fetch(
+        `http://localhost:5000/customers/${id}`,
+        {
+          method: "DELETE",
+        }
+      );
 
-    await fetch(
-      `http://localhost:5000/customers/${id}`,
-      {
-        method: "DELETE",
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || "Failed to delete customer");
       }
-    );
 
-    fetchCustomers();
-
+      fetchCustomers();
+    } catch (err) {
+      alert("Error: " + err.message);
+    }
   };
 
   // EDIT CUSTOMER

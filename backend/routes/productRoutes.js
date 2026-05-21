@@ -1,17 +1,7 @@
 const express = require("express");
 const router = express.Router();
 
-const sqlite3 = require("sqlite3").verbose();
-const pool = require("../db");
-
-// DATABASE CONNECTION
-const db = new sqlite3.Database("./erp.db", (err) => {
-  if (err) {
-    console.log("Database connection error");
-  } else {
-    console.log("Connected to SQLite database");
-  }
-});
+const db = require("../sqliteDb");
 
 // CREATE TABLE
 db.run(`
